@@ -1,7 +1,11 @@
 package ait.numbers.model;
 
+import ait.numbers.task.OneGroupSum;
+
 import java.util.Arrays;
+import java.util.List;
 import java.util.concurrent.*;
+import java.util.stream.Collectors;
 
 public class ExecutorGroupSum extends GroupSum {
     public ExecutorGroupSum(int[][] numberGroups) {
@@ -10,32 +14,19 @@ public class ExecutorGroupSum extends GroupSum {
 
     @Override
     public int computeSum() {
-        int totalSum = 0;
-
-        ExecutorService executorService = Executors.newFixedThreadPool(numberGroups.length);
-
-
-        CompletionService<Integer> completionService = new ExecutorCompletionService<>(executorService);
-
-        for (int[] group : numberGroups) {
-
-            completionService.submit(() -> Arrays.stream(group).sum());
-        }
-
+        int poolSize = Runtime.getRuntime().availableProcessors();
+        ExecutorService executorService = Executors.newFixedThreadPool(poolSize);
+        List<OneGroupSum> groupSums = Arrays.stream(numberGroups)
+                .map(OneGroupSum::new)
+                .peek(executorService::execute)
+                .collect(Collectors.toList());
+        executorService.shutdown();
         try {
-
-            for (int i = 0; i < numberGroups.length; i++) {
-                Future<Integer> result = completionService.take();
-                totalSum += result.get();
-            }
-        } catch (InterruptedException | ExecutionException e) {
+            executorService.awaitTermination(1, TimeUnit.MINUTES);
+        } catch (InterruptedException e) {
+            // TODO Auto-generated catch block
             e.printStackTrace();
-        } finally {
-
-            executorService.shutdown();
         }
-
-
-        return totalSum;
+        return groupSums.stream().mapToInt(OneGroupSum::getSum).sum();
     }
 }
